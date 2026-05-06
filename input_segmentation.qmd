@@ -1,0 +1,108 @@
+---
+title: "Untitled"
+format: html
+---
+
+## Import the dataset
+
+```{r}
+
+library(readr)
+
+wildschwein <- read_delim("Data/wildschwein_BE_2056.csv")
+# wildschwein <- read.csv("Data/wildschwein_BE_2056.csv")  
+wildschwein <- read_csv("Data/wildschwein_BE_2056.csv")
+
+
+library(sf)
+
+wildschein_sf <- st_as_sf(wildschwein, coords = c("E", "N"), crs = 2056, remove = FALSE)
+
+
+library(dplyr)
+
+# only get the data form sabi between 1 and 3 of July 2015
+sabi <- filter(wildschein_sf, TierName == "Sabi", DatetimeUTC > "2015-07-01", DatetimeUTC < "2015-07-03")
+
+
+# visualize the result
+
+library(ggplot2)
+
+ggplot(sabi) +
+  geom_sf() +
+  geom_path(aes(E, N))
+
+```
+
+
+## Step a): Specify a temporal window v
+
+-pos[n-2] to pos[n]
+-pos[n-1] to pos[n]
+-pos[n] to pos[n+1]
+-pos[n] to pos[n+2]
+
+```{r}
+
+distance_by_element <- function(later, now) {
+  as.numeric(
+    st_distance(later, now, by_element = TRUE)
+  )
+}
+
+
+sabi <- sabi |> 
+  mutate(
+    nMinus2 = distance_by_element(lag(geometry, n = 2), geometry),
+    nMinus1 = distance_by_element(lag(geometry, n = 1), geometry),
+    nPlus1 = distance_by_element(geometry, lead(geometry, n = 1)),
+    nPlus2 = distance_by_element(geometry, lead(geometry, n = 2))
+  )
+
+sabi <- sabi |> 
+  rowwise()|> 
+  mutate(
+    stepMean = mean(c(nMinus2, nMinus1, nPlus1, nPlus2), na.rm = FALSE)
+  ) |> 
+  ungroup()
+
+
+sabi
+
+
+```
+
+
+## Step c) remove static points
+
+```{r}
+
+
+# first, specify a threshold. For a simple approach, we'll use the "mean" value as a threshold value
+# to differentiate between stops and moves
+threshold <- mean(sabi$stepMean, na.rm = TRUE)
+
+sabi <- sabi |> 
+  mutate(
+    static = stepMean < threshold
+  )
+
+
+
+ggplot(sabi) +
+  geom_path(aes(E,N)) +
+  geom_sf(aes(color = static))
+
+
+
+sabi_move <- sabi |> 
+  filter(!static)
+
+
+ggplot(sabi_move) +
+  geom_path(aes(E,N)) +
+  geom_sf(aes(color = static))
+
+
+```
