@@ -10,7 +10,7 @@ format: html
 library(readr)
 
 wildschwein <- read_delim("Data/wildschwein_BE_2056.csv")
-# wildschwein <- read.csv("Data/wildschwein_BE_2056.csv")  
+wildschwein <- read.csv("Data/wildschwein_BE_2056.csv")
 wildschwein <- read_csv("Data/wildschwein_BE_2056.csv")
 
 
